@@ -10,18 +10,37 @@
  * 4. Los guarda en Supabase con pgvector
  */
 
+import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // Necesita service role para insertar
-);
+// Cargar variables de entorno desde .env.local o .env
+config({ path: ".env.local" });
+config({ path: ".env" });
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const openaiKey = process.env.OPENAI_API_KEY;
+
+if (!supabaseUrl || !supabaseKey || !openaiKey) {
+  console.error("Error: Faltan variables de entorno requeridas");
+  console.error("  NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl ? "✓" : "✗");
+  console.error(
+    "  SUPABASE_SERVICE_ROLE_KEY o ANON_KEY:",
+    supabaseKey ? "✓" : "✗",
+  );
+  console.error("  OPENAI_API_KEY:", openaiKey ? "✓" : "✗");
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: openaiKey,
 });
 
 interface Document {
