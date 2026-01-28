@@ -80,17 +80,43 @@ export async function POST(request: NextRequest) {
     // Perform RAG search if query is nutrition-related
     let relevantDocs: { content: string; source: string }[] | null = null;
     try {
-      const { data } = await supabase.rpc("match_documents", {
-        query_embedding: await getEmbedding(message),
-        match_threshold: 0.7,
-        match_count: 3,
-      });
-      relevantDocs = data;
-    } catch {
-      // RAG search failed, continue without context
+      console.log(
+        "[RAG] Searching vector database for:",
+        message.substring(0, 50) + "...",
+      );
+      const embedding = await getEmbedding(message);
+
+      if (embedding.length > 0) {
+        const { data, error } = await supabase.rpc("match_documents", {
+          query_embedding: embedding,
+          match_threshold: 0.7,
+          match_count: 3,
+        });
+
+        if (error) {
+          console.log("[RAG] Vector search error:", error.message);
+        } else {
+          relevantDocs = data;
+          console.log(
+            "[RAG] Found",
+            relevantDocs?.length || 0,
+            "relevant documents",
+          );
+        }
+      } else {
+        console.log(
+          "[RAG] Embedding generation failed, skipping vector search",
+        );
+      }
+    } catch (ragError) {
+      console.log("[RAG] Vector search failed:", ragError);
     }
 
     if (relevantDocs && relevantDocs.length > 0) {
+      console.log(
+        "[RAG] Using context from:",
+        relevantDocs.map((d) => d.source).join(", "),
+      );
       const context = relevantDocs
         .map(
           (doc: { content: string; source: string }) =>
@@ -102,6 +128,10 @@ export async function POST(request: NextRequest) {
         role: "system",
         content: `Información científica relevante para tu respuesta:\n\n${context}\n\nUsa esta información para fundamentar tu respuesta cuando sea apropiado.`,
       });
+    } else {
+      console.log(
+        "[RAG] No relevant documents found, using base knowledge only",
+      );
     }
 
     chatMessages.push({ role: "user", content: message });
